@@ -1,0 +1,182 @@
+---
+title: "Gaussian Naive Bayes"
+author: "Yoel Graumann"
+date: "4 7 2021"
+output: html_document
+---
+
+```{r}
+library("readr")
+my_data <- read_delim("shock.data.tab.96.txt",delim=' ')
+indi<-sample(2,nrow(my_data),replace = TRUE,prob = c(0.7,0.3))
+train<-my_data[indi==1,]
+test<-my_data[indi==2,]
+```
+
+
+
+```{r}
+
+### preproccesing
+final_test<-test
+final_train<-train
+final_test$id<-NULL
+final_train$id<-NULL
+final_test$shocktp<-NULL
+final_train$shocktp<-NULL
+final_test$sex<-NULL
+final_train$sex<-NULL
+final_test$survival<-as.factor(final_test$survival)
+final_train$survival<-as.factor(final_train$survival)
+y_test<-final_test$survival
+y_train<-final_train$survival
+final_test$survival<-NULL
+final_train$survival<-NULL
+#### remove dp
+#final_test$dp<-NULL
+#final_train$dp<-NULL
+####remove hct
+
+#final_test$hct<-NULL
+#final_train$hct<-NULL
+
+
+#### remove mct
+#final_test$mct<-NULL
+#final_train$mct<-NULL
+
+
+### remove
+
+#final_test$vi<-NULL
+#final_train$vi<-NULL
+```
+
+
+
+```{}
+### Data cleaning
+### 1 survived, 3 died
+real_train<-matrix()
+real_train$height<-train$height
+real_train$uo<-train$uo
+real_train$mvp<-train$mvp
+real_train$y<-train$survival
+real_train<-as.data.frame(real_train)
+real_train$NA.<-NULL
+real_train$y<-as.factor(real_train$y)
+x_vals<-real_train
+x_vals$y<-NULL
+y_vals<-real_train$y
+
+
+###
+
+
+
+real_test<-matrix()
+real_test$height<-test$height
+real_test$uo<-test$uo
+real_test$mvp<-test$mvp
+real_test$y<-test$survival
+real_test<-as.data.frame(real_test)
+real_test$NA.<-NULL
+real_test$y<-as.factor(real_test$y)
+x_test<-real_test
+x_test$y<-NULL
+y_test<-real_test$y
+```
+
+
+##### Gaussian Naive Bayes fitting function:
+
+
+
+```{r}
+Gaussian_Naive_Bayes<-function(X,y){
+  y<-as.factor(y)
+  ##First lets work on the priors....
+  priors<-as.data.frame(table(y))
+  priors$Freq<-priors$Freq/sum(priors$Freq)
+  # Let's get the distributions
+  data<-cbind(X,y)
+  ### splits by category
+splitted<-split(data,y)
+another_one<-split(data,y)
+
+for (category in 1:length(splitted)){
+    mtx<-matrix(data=NA,nrow=length(X),ncol=2)
+    for(feature in 1:(length(splitted[[category]])-1)){
+      ### get mu and sd for each feature for every category....
+      name<-colnames(splitted[[category]][feature])
+      mu<-mean(get(name,splitted[[category]]))
+      sigma<-sd(get(name,splitted[[category]]))
+      mtx[feature,]<-c(mu,sigma)
+    }
+    
+    ###### this list holds a matrix for every category col1 is the mu, col2 is sigma, the rows are the original features
+    another_one[[category]]<-mtx
+}
+another_one['priors']<-as.data.frame(priors$Freq)
+
+return(another_one)
+}
+```
+
+#### Gaussian Naive Bayes prediction function.
+
+```{r}
+gnb.predict<-function(fitted.model,X,text){
+predictions<-matrix(data=NA,ncol=(length(fitted.model)-1),nrow=nrow(X))
+renaming<-names(fitted.model)
+renaming<-renaming[-length(renaming)]
+colnames(predictions)<-c(renaming)
+### category
+for(category in 1:(length(fitted.model)-1)){
+  for(obs in 1:nrow(X)){
+     prob<-gnb.model$priors[category]
+    for(feature in 1:ncol(X)){
+      temp_gaus<-dnorm(x=X[obs,feature],mean=fitted.model[[category]][feature,1],sd=fitted.model[[category]][feature,2])
+      prob<-prob*temp_gaus
+    }
+    predictions[obs,category]<-prob
+    }
+  }
+if (text=='probs'){
+  return(predictions)
+}
+classes<-  colnames(predictions)[max.col(predictions[,], ties.method = "first")]
+return(as.vector(classes))
+}
+```
+
+
+
+
+```{r}
+y_train<-ifelse(y_train==1,"LIVE","DIE")
+gnb.model=Gaussian_Naive_Bayes(X=as.data.frame(final_train),y=y_train)
+```
+
+```{r}
+
+answer=gnb.predict(gnb.model,as.data.frame(final_test),text='class')
+answer
+```
+
+
+```{r}
+
+library(naivebayes)
+testing_data<-cbind(final_train,y_train)
+model <- naive_bayes(y_train ~ ., data = testing_data) 
+p <- predict(model, final_test, type = 'class')
+p
+```
+
+
+
+```{r}
+
+
+```
